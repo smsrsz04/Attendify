@@ -1,0 +1,161 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #8B2635 0%, #A0342A 50%, #BD953E 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.container {
+    width: 100%;
+    max-width: 400px;
+}
+
+.login-card {
+    background: rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+
+/* Header */
+.title {
+    font-size: 32px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 40px;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 16px;
+    color: rgba(255, 255, 255, 0.6);
+    z-index: 2;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 16px 16px 16px 50px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: white;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.form-group input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.form-group input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Eye Icon for Password */
+.eye-icon {
+    position: absolute;
+    right: 16px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.3s ease;
+}
+
+.eye-icon:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Forgot Password */
+.forgot-password {
+    text-align: right;
+    margin-bottom: 30px;
+}
+
+.forgot-link {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.forgot-link:hover {
+    color: white;
+}
+
+/* Sign In Button */
+.signin-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #D4B350, #BD953E);
+    color: white;
+    font-size: 18px;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(189, 149, 62, 0.3);
+}
+
+.signin-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(189, 149, 62, 0.4);
+}
+
+.signin-btn:active {
+    transform: translateY(0);
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+    .login-card {
+        padding: 30px 20px;
+        margin: 0 10px;
+    }
+    
+    .title {
+        font-size: 28px;
+    }
+    
+    .user-icon {
+        width: 70px;
+        height: 70px;
+        margin-bottom: 25px;
+    }
+}
