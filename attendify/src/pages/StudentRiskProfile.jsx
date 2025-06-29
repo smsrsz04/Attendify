@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import {
   Calendar,
   BarChart3,
@@ -25,7 +26,20 @@ import './StudentRiskProfile.css';
 
 const RISK_LEVELS = ['low', 'medium', 'high'];
 
-const StudentRiskProfile = () => {
+const detectAnomalies = (attendanceArray) => {
+  const data = attendanceArray.map(Number);
+  const mean = data.reduce((sum, val) => sum + val, 0) / data.length;
+  const std = Math.sqrt(data.reduce((sum, val) => sum + (val - mean) ** 2, 0) / data.length);
+
+  return data.map((value, index) => ({
+    index,
+    value,
+    isAnomaly: Math.abs(value - mean) > 2 * std,
+  }));
+};
+
+const Dashboard = () => {
+  const [anomalies, setAnomalies] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [profiles, setProfiles] = useState([]);
@@ -35,6 +49,7 @@ const StudentRiskProfile = () => {
   const [riskFilter, setRiskFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [studentAnomalies, setStudentAnomalies] = useState([]);
 
   const attendanceTrendData = useMemo(() => [
     { week: 'Week 1', attendance: 85, risk: 20 },
@@ -56,7 +71,7 @@ const StudentRiskProfile = () => {
     { month: 'Jun', low: 5, medium: 16, high: 12 },
   ], []);
 
-  const anomalies = useMemo(() => [
+  const sampleAnomalies = useMemo(() => [
     {
       date: '2024-06-10',
       description: 'Sudden drop in attendance',
@@ -76,6 +91,24 @@ const StudentRiskProfile = () => {
       severity: 'low'
     }
   ], []);
+
+  useEffect(() => {
+    const fetchAnomalies = async () => {
+      try {
+        const res = await fetch('/api/anomalies/today');
+        const data = await res.json();
+
+        if (data.length > 0) {
+          setAnomalies(data);
+          toast.warning(`⚠️ ${data.length} attendance anomal${data.length > 1 ? 'ies' : 'y'} detected today.`);
+        }
+      } catch (err) {
+        console.error('Failed to fetch anomalies:', err);
+      }
+    };
+
+    fetchAnomalies();
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -99,6 +132,16 @@ const StudentRiskProfile = () => {
       });
   }, [page, limit, riskFilter, searchTerm]);
 
+  useEffect(() => {
+    const fetchStudentAnomalies = () => {
+      if (!selectedStudent) return;
+      const history = selectedStudent.weekly_attendance || [85, 80, 75, 70, 65, 60, 55, 65];
+      const detected = detectAnomalies(history).filter(a => a.isAnomaly);
+      setStudentAnomalies(detected);
+    };
+    fetchStudentAnomalies();
+  }, [selectedStudent]);
+
   const totalPages = Math.ceil(total / limit);
 
   const filteredStudents = useMemo(() => {
@@ -109,7 +152,6 @@ const StudentRiskProfile = () => {
   }, [searchTerm, profiles]);
 
   const isActive = (path) => window.location.pathname === path;
-
   const getRiskBadgeClass = (riskLevel) => `risk-badge risk-${riskLevel}`;
 
   return (
@@ -158,9 +200,17 @@ const StudentRiskProfile = () => {
       </aside>
 
       <main className="main-content">
+        {/* 🚨 Anomaly Alert Banner */}
+        {anomalies.length > 0 && (
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded-xl shadow-md">
+            <p className="font-semibold">⚠️ Alert: {anomalies.length} anomal{anomalies.length > 1 ? 'ies' : 'y'} detected in attendance today.</p>
+            <a href="/admin/anomalies" className="text-blue-700 underline hover:text-blue-900">View anomaly details</a>
+          </div>
+        )}
+
         <div className="page-header">
-          <h1 className="page-title">Student Risk Profile</h1>
-          <p className="page-description">Detailed analysis of individual student attendance patterns and risk assessments</p>
+          <h1 className="page-title">Student Risk Dashboard</h1>
+          <p className="page-description">Comprehensive view of attendance anomalies and student risk profiles</p>
         </div>
 
         {/* Controls Section */}
@@ -261,7 +311,20 @@ const StudentRiskProfile = () => {
                     <XAxis dataKey="week" />
                     <YAxis />
                     <Tooltip />
-                    <Line type="monotone" dataKey="attendance" stroke="#10b981" strokeWidth={2} name="Attendance %" />
+                    <Line
+                      type="monotone"
+                      dataKey="attendance"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      name="Attendance %"
+                      dot={({ cx, cy, payload, index }) =>
+                        studentAnomalies.find(a => a.index === index) ? (
+                          <circle cx={cx} cy={cy} r={6} fill="#ef4444" stroke="#000" strokeWidth={1} />
+                        ) : (
+                          <circle cx={cx} cy={cy} r={3} fill="#10b981" />
+                        )
+                      }
+                    />
                     <Line type="monotone" dataKey="risk" stroke="#ef4444" strokeWidth={2} name="Risk Level %" />
                   </LineChart>
                 </ResponsiveContainer>
@@ -284,8 +347,25 @@ const StudentRiskProfile = () => {
             </div>
 
             <div className="anomalies-section">
+              <h3 className="anomalies-title">AI-Detected Attendance Anomalies</h3>
+              {studentAnomalies.length === 0 ? (
+                <p>No anomalies detected in recent attendance.</p>
+              ) : (
+                studentAnomalies.map((anomaly, index) => (
+                  <div key={index} className="anomaly-item">
+                    <div className="anomaly-icon"><AlertCircle size={20} /></div>
+                    <div className="anomaly-content">
+                      <p className="anomaly-date">Week {anomaly.index + 1}</p>
+                      <p className="anomaly-description">Unusual attendance: {anomaly.value}%</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="anomalies-section">
               <h3 className="anomalies-title">Recent Anomalies & Context</h3>
-              {anomalies.map((anomaly, index) => (
+              {sampleAnomalies.map((anomaly, index) => (
                 <div key={index} className="anomaly-item">
                   <div className="anomaly-icon"><AlertCircle size={20} /></div>
                   <div className="anomaly-content">
@@ -309,4 +389,4 @@ const StudentRiskProfile = () => {
   );
 };
 
-export default StudentRiskProfile;
+export default Dashboard;
