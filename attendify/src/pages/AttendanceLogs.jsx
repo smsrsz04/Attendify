@@ -21,33 +21,40 @@ const AttendanceLogs = () => {
   const [dateFilter, setDateFilter] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-
-  // Sample data - replace with actual API call
-  const sampleLogs = [
-    { id: 1, studentId: 'STU001', studentName: 'John Doe', timestamp: '2025-06-13 08:30:00', subject: 'Mathematics', status: 'Present' },
-    { id: 2, studentId: 'STU002', studentName: 'Jane Smith', timestamp: '2025-06-13 08:32:00', subject: 'Mathematics', status: 'Present' },
-    { id: 3, studentId: 'STU003', studentName: 'Mike Johnson', timestamp: '2025-06-13 09:15:00', subject: 'Physics', status: 'Late' },
-    { id: 4, studentId: 'STU001', studentName: 'John Doe', timestamp: '2025-06-13 10:00:00', subject: 'Chemistry', status: 'Present' },
-    { id: 5, studentId: 'STU004', studentName: 'Sarah Wilson', timestamp: '2025-06-13 10:05:00', subject: 'Chemistry', status: 'Present' },
-    { id: 6, studentId: 'STU002', studentName: 'Jane Smith', timestamp: '2025-06-12 08:30:00', subject: 'Mathematics', status: 'Absent' },
-    { id: 7, studentId: 'STU005', studentName: 'David Brown', timestamp: '2025-06-12 09:00:00', subject: 'English', status: 'Present' },
-    { id: 8, studentId: 'STU003', studentName: 'Mike Johnson', timestamp: '2025-06-12 14:30:00', subject: 'History', status: 'Present' },
-  ];
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const subjects = ['All Subjects', 'Mathematics', 'Physics', 'Chemistry', 'English', 'History'];
 
   useEffect(() => {
-    setLogs(sampleLogs);
-    setFilteredLogs(sampleLogs);
-  }, []);
+    setLoading(true);
+    fetch(`https://attendify-api.vercel.app/attendance_logs/?page=${page}&limit=${limit}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch attendance logs.');
+        return res.json();
+      })
+      .then((data) => {
+        setLogs(data.logs || []);
+        setFilteredLogs(data.logs || []);
+        setTotal(data.total || 0);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [page, limit]);
 
   useEffect(() => {
     let filtered = logs;
 
     if (searchTerm) {
       filtered = filtered.filter(log =>
-        log.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.studentName.toLowerCase().includes(searchTerm.toLowerCase())
+        log.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -75,8 +82,8 @@ const AttendanceLogs = () => {
     const csvContent = [
       headers.join(','),
       ...filteredLogs.map(log => [
-        log.studentId,
-        log.studentName,
+        log.student_id,
+        log.name,
         log.timestamp,
         log.subject,
         log.status
@@ -93,7 +100,6 @@ const AttendanceLogs = () => {
   };
 
   const handleExportPDF = () => {
-    // Basic PDF export simulation
     alert('PDF export functionality would be implemented here using a library like jsPDF');
   };
 
@@ -111,63 +117,45 @@ const AttendanceLogs = () => {
     }
   };
 
+  const totalPages = Math.ceil(total / limit);
+
   return (
     <div className="dashboard-container">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <h1 className="logo">Attendify</h1>
         </div>
-        
         <nav className="sidebar-nav">
           <div className="nav-section">
             <span className="nav-section-title">TRACK</span>
-            <Link 
-              to="/anomaly-detection" 
-              className={`nav-item ${isActive('/anomaly-detection') ? 'active' : ''}`}
-            >
+            <Link to="/anomaly-detection" className={`nav-item ${isActive('/anomaly-detection') ? 'active' : ''}`}>
               <Calendar size={20} />
               <span>Anomaly Detection</span>
             </Link>
           </div>
-          
           <div className="nav-section">
             <span className="nav-section-title">ANALYZE</span>
-            <Link 
-              to="/dashboard" 
-              className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`}
-            >
+            <Link to="/dashboard" className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`}>
               <BarChart3 size={20} />
               <span>Dashboard</span>
             </Link>
           </div>
-          
           <div className="nav-section">
             <span className="nav-section-title">MANAGE</span>
-            <Link 
-              to="/student-management" 
-              className={`nav-item ${isActive('/student-management') ? 'active' : ''}`}
-            >
+            <Link to="/student-management" className={`nav-item ${isActive('/student-management') ? 'active' : ''}`}>
               <Users size={20} />
               <span>Student Management</span>
             </Link>
-            <Link 
-              to="/attendance-logs" 
-              className={`nav-item ${isActive('/attendance-logs') ? 'active' : ''}`}
-            >
+            <Link to="/attendance-logs" className={`nav-item ${isActive('/attendance-logs') ? 'active' : ''}`}>
               <FileText size={20} />
               <span>Attendance Logs</span>
             </Link>
-            <Link 
-              to="/student-risk-profile" 
-              className={`nav-item ${isActive('/student-risk-profile') ? 'active' : ''}`}
-            >
+            <Link to="/student-risk-profile" className={`nav-item ${isActive('/student-risk-profile') ? 'active' : ''}`}>
               <AlertTriangle size={20} />
               <span>Student Risk Profile</span>
             </Link>
           </div>
         </nav>
-        
         <div className="sidebar-footer">
           <Link to="/logout" className="nav-item">
             <LogOut size={20} />
@@ -175,16 +163,12 @@ const AttendanceLogs = () => {
           </Link>
         </div>
       </aside>
-
-      {/* Main Content */}
       <main className="main-content">
         <div className="page-header">
           <h1>Attendance Logs</h1>
           <p>View and manage daily attendance records</p>
         </div>
-
         <div className="logs-container">
-          {/* Controls */}
           <div className="logs-controls">
             <div className="search-container">
               <Search size={20} className="search-icon" />
@@ -196,17 +180,12 @@ const AttendanceLogs = () => {
                 className="search-input"
               />
             </div>
-
             <div className="filter-controls">
-              <button 
-                className="filter-toggle"
-                onClick={() => setShowFilters(!showFilters)}
-              >
+              <button className="filter-toggle" onClick={() => setShowFilters(!showFilters)}>
                 <Filter size={20} />
                 Filters
                 <ChevronDown size={16} className={showFilters ? 'rotated' : ''} />
               </button>
-
               <div className="export-buttons">
                 <button onClick={handleExportCSV} className="export-btn csv">
                   <Download size={16} />
@@ -219,8 +198,6 @@ const AttendanceLogs = () => {
               </div>
             </div>
           </div>
-
-          {/* Filter Panel */}
           {showFilters && (
             <div className="filter-panel">
               <div className="filter-group">
@@ -232,7 +209,6 @@ const AttendanceLogs = () => {
                   className="filter-input"
                 />
               </div>
-
               <div className="filter-group">
                 <label>Subject</label>
                 <select
@@ -245,44 +221,36 @@ const AttendanceLogs = () => {
                   ))}
                 </select>
               </div>
-
-              <button 
-                onClick={() => {
-                  setSearchTerm('');
-                  setDateFilter('');
-                  setSubjectFilter('');
-                }}
-                className="clear-filters-btn"
-              >
+              <button onClick={() => {
+                setSearchTerm('');
+                setDateFilter('');
+                setSubjectFilter('');
+              }} className="clear-filters-btn">
                 Clear Filters
               </button>
             </div>
           )}
-
-          {/* Results Summary */}
           <div className="results-summary">
-            <span>Showing {filteredLogs.length} records</span>
+            <span>Showing {filteredLogs.length} of {total} records</span>
           </div>
-
-          {/* Logs Table */}
           <div className="table-container">
             <table className="logs-table">
               <thead>
                 <tr>
-                  <th>Student ID</th>
+                  <th>Date</th>
                   <th>Student Name</th>
-                  <th>Timestamp</th>
+                  <th>Student ID</th>
                   <th>Subject</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredLogs.map(log => (
-                  <tr key={log.id}>
-                    <td className="student-id">{log.studentId}</td>
-                    <td className="student-name">{log.studentName}</td>
-                    <td className="timestamp">{formatTimestamp(log.timestamp)}</td>
-                    <td className="subject">{log.subject}</td>
+                {filteredLogs.map((log, index) => (
+                  <tr key={index}>
+                    <td>{formatTimestamp(log.timestamp)}</td>
+                    <td>{log.name}</td>
+                    <td>{log.student_id}</td>
+                    <td>{log.subject}</td>
                     <td>
                       <span className={`status-badge ${getStatusClass(log.status)}`}>
                         {log.status}
@@ -292,7 +260,6 @@ const AttendanceLogs = () => {
                 ))}
               </tbody>
             </table>
-
             {filteredLogs.length === 0 && (
               <div className="empty-state">
                 <FileText size={48} />
@@ -300,6 +267,11 @@ const AttendanceLogs = () => {
                 <p>Try adjusting your search criteria or filters</p>
               </div>
             )}
+          </div>
+          <div className="pagination">
+            <button onClick={() => setPage(p => Math.max(p - 1, 1))} disabled={page === 1}>Previous</button>
+            <span>Page {page} of {totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(p + 1, totalPages))} disabled={page === totalPages}>Next</button>
           </div>
         </div>
       </main>

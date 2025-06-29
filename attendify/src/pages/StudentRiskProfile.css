@@ -422,3 +422,111 @@
 .student-id {
   color: #6b7280;
 }
+
+.risk-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.risk-table th,
+.risk-table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.risk-low {
+  color: green;
+  font-weight: bold;
+}
+
+.risk-medium {
+  color: orange;
+  font-weight: bold;
+}
+
+.risk-high {
+  color: red;
+  font-weight: bold;
+}
+
+.error {
+  color: red;
+  font-weight: bold;
+}
+
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.pagination button {
+  padding: 8px 16px;
+  background-color: #333;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.pagination button:disabled {
+  background-color: #aaa;
+  cursor: not-allowed;
+}
+
+.controls-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.risk-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #d1d5db;
+  background-color: white;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  background-color: #f3f4f6;
+}
+
+.filter-btn.active {
+  background-color: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  background-color: white;
+}
+
+.search-container input {
+  border: none;
+  outline: none;
+  font-size: 0.9rem;
+  background: transparent;
+  width: 200px;
+}

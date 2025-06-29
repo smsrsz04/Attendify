@@ -1,184 +1,176 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Calendar, 
-  BarChart3, 
-  FileText, 
-  Users, 
-  AlertTriangle, 
-  Bell, 
-  LogOut,
-  Search,
-  Filter,
-  CheckCircle,
-  XCircle,
-  AlertCircle
+import {
+  Calendar, BarChart3, FileText, Users, AlertTriangle, LogOut,
+  Search, Filter, CheckCircle, XCircle, AlertCircle
 } from 'lucide-react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import './AnomalyDetection.css';
 
 const AnomalyDetection = () => {
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterReason, setFilterReason] = useState('all');
-  
-  // Mock data for flagged records
-  const [flaggedRecords, setFlaggedRecords] = useState([
-    {
-      id: 1,
-      student_id: 'STU001',
-      student_name: 'John Doe',
-      date: '2024-06-10',
-      reason: 'Irregular Pattern',
-      risk_score: 85,
-      status: 'pending',
-      details: 'Attendance pattern deviates from normal schedule'
-    },
-    {
-      id: 2,
-      student_id: 'STU045',
-      student_name: 'Jane Smith',
-      date: '2024-06-09',
-      reason: 'Multiple Check-ins',
-      risk_score: 92,
-      status: 'pending',
-      details: 'Multiple check-ins detected within short time frame'
-    },
-    {
-      id: 3,
-      student_id: 'STU023',
-      student_name: 'Mike Johnson',
-      date: '2024-06-08',
-      reason: 'Late Night Access',
-      risk_score: 78,
-      status: 'confirmed',
-      details: 'Access recorded outside normal hours'
-    },
-    {
-      id: 4,
-      student_id: 'STU067',
-      student_name: 'Sarah Wilson',
-      date: '2024-06-07',
-      reason: 'Location Mismatch',
-      risk_score: 88,
-      status: 'false_positive',
-      details: 'Student location doesn\'t match expected classroom'
+  const [flaggedRecords, setFlaggedRecords] = useState([]);
+  const [filteredRecords, setFilteredRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [totalAnomalies, setTotalAnomalies] = useState(0);
+  const [pendingReview, setPendingReview] = useState(0);
+  const [highRisk, setHighRisk] = useState(0);
+  const [falsePositives, setFalsePositives] = useState(0);
+
+  const [page, setPage] = useState(1);
+  const limit = 10;
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`https://attendify-api.vercel.app/anomalies/?page=${page}&limit=${limit}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch anomaly data.');
+        return res.json();
+      })
+      .then(async data => {
+        const updatedRecords = await Promise.all(
+          data.flagged_records.map(async record => {
+            if (!record.student_name) {
+              try {
+                const res = await fetch(`https://attendify-api.vercel.app/students/${record.student_id}`);
+                if (res.ok) {
+                  const stu = await res.json();
+                  return { ...record, student_name: stu.name || 'Unknown' };
+                }
+              } catch {}
+              return { ...record, student_name: 'Unknown' };
+            }
+            return record;
+          })
+        );
+
+        setFlaggedRecords(updatedRecords);
+        setTotalAnomalies(data.total_anomalies || 0);
+        setPendingReview(data.pending_review || 0);
+        setHighRisk(data.high_risk || 0);
+        setFalsePositives(data.false_positives || 0);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, [page]);
+
+  useEffect(() => {
+    const result = flaggedRecords.filter(record => {
+      if (!record) return false;
+      const name = record.student_name || '';
+      return (
+        (name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        record.student_id.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        (filterReason === 'all' || record.reason === filterReason)
+      );
+    });
+    setFilteredRecords(result);
+  }, [flaggedRecords, searchTerm, filterReason]);
+
+  const totalPages = Math.ceil(totalAnomalies / limit);
+
+  const isActive = path => location.pathname === path;
+
+  const handleOverride = (id, newStatus) => {
+    const record = flaggedRecords.find(r => r.id === id);
+    if (!record) return;
+
+    const prevStatus = record.status;
+    const actionLabel = newStatus === 'confirmed'
+      ? 'Confirm this anomaly?'
+      : newStatus === 'false_positive'
+      ? 'Mark as false positive?'
+      : 'Reset status to pending?';
+
+    if (!window.confirm(actionLabel)) return;
+
+    if (prevStatus !== newStatus) {
+      if (prevStatus === 'pending') setPendingReview(p => p - 1);
+      if (prevStatus === 'confirmed') setHighRisk(h => h - 1);
+      if (prevStatus === 'false_positive') setFalsePositives(fp => fp - 1);
+
+      if (newStatus === 'pending') setPendingReview(p => p + 1);
+      if (newStatus === 'confirmed') setHighRisk(h => h + 1);
+      if (newStatus === 'false_positive') setFalsePositives(fp => fp + 1);
     }
-  ]);
 
-  const isActive = (path) => {
-    return location.pathname === path;
-  };
-
-  const handleOverride = (recordId, action) => {
     setFlaggedRecords(records =>
-      records.map(record =>
-        record.id === recordId
-          ? { ...record, status: action }
-          : record
-      )
+      records.map(r => r.id === id ? { ...r, status: newStatus } : r)
     );
+
+    const msg = newStatus === 'pending'
+      ? 'Status reset to pending.'
+      : newStatus === 'confirmed'
+      ? 'Anomaly confirmed.'
+      : 'Marked as false positive.';
+    toast.success(msg);
   };
 
-  const getRiskScoreColor = (score) => {
-    if (score >= 90) return 'risk-critical';
-    if (score >= 75) return 'risk-high';
-    if (score >= 50) return 'risk-medium';
-    return 'risk-low';
-  };
+  const getRiskScoreColor = score =>
+    score >= 90 ? 'risk-critical' :
+    score >= 75 ? 'risk-high' :
+    score >= 50 ? 'risk-medium' : 'risk-low';
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'confirmed':
-        return <XCircle className="status-icon confirmed" />;
-      case 'false_positive':
-        return <CheckCircle className="status-icon false-positive" />;
-      default:
-        return <AlertCircle className="status-icon pending" />;
-    }
-  };
+  const getStatusIcon = status =>
+    status === 'confirmed' ? <XCircle className="status-icon confirmed" /> :
+    status === 'false_positive' ? <CheckCircle className="status-icon false-positive" /> :
+    <AlertCircle className="status-icon pending" />;
 
-  const filteredRecords = flaggedRecords.filter(record => {
-    const matchesSearch = record.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         record.student_id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterReason === 'all' || record.reason === filterReason;
-    return matchesSearch && matchesFilter;
-  });
-
-  const reasons = [...new Set(flaggedRecords.map(record => record.reason))];
+  const reasons = [...new Set(flaggedRecords.map(r => r.reason))];
 
   return (
     <div className="dashboard-container">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <h1 className="logo">Attendify</h1>
         </div>
-        
         <nav className="sidebar-nav">
           <div className="nav-section">
             <span className="nav-section-title">TRACK</span>
-            <Link
-              to="/anomaly-detection"
-              className={`nav-item ${isActive('/anomaly-detection') ? 'active' : ''}`}
-            >
-              <Calendar size={20} />
-              <span>Anomaly Detection</span>
+            <Link to="/anomaly-detection" className={`nav-item ${isActive('/anomaly-detection') ? 'active' : ''}`}>
+              <Calendar size={20} /><span>Anomaly Detection</span>
             </Link>
           </div>
-          
           <div className="nav-section">
             <span className="nav-section-title">ANALYZE</span>
-            <Link
-              to="/dashboard"
-              className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`}
-            >
-              <BarChart3 size={20} />
-              <span>Dashboard</span>
+            <Link to="/dashboard" className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`}>
+              <BarChart3 size={20} /><span>Dashboard</span>
             </Link>
           </div>
-          
           <div className="nav-section">
             <span className="nav-section-title">MANAGE</span>
-            <Link
-              to="/student-management"
-              className={`nav-item ${isActive('/student-management') ? 'active' : ''}`}
-            >
-              <Users size={20} />
-              <span>Student Management</span>
+            <Link to="/student-management" className={`nav-item ${isActive('/student-management') ? 'active' : ''}`}>
+              <Users size={20} /><span>Student Management</span>
             </Link>
-            <Link
-              to="/attendance-logs"
-              className={`nav-item ${isActive('/attendance-logs') ? 'active' : ''}`}
-            >
-              <FileText size={20} />
-              <span>Attendance Logs</span>
+            <Link to="/attendance-logs" className={`nav-item ${isActive('/attendance-logs') ? 'active' : ''}`}>
+              <FileText size={20} /><span>Attendance Logs</span>
             </Link>
-            <Link
-              to="/student-risk-profile"
-              className={`nav-item ${isActive('/student-risk-profile') ? 'active' : ''}`}
-            >
-              <AlertTriangle size={20} />
-              <span>Student Risk Profile</span>
+            <Link to="/student-risk-profile" className={`nav-item ${isActive('/student-risk-profile') ? 'active' : ''}`}>
+              <AlertTriangle size={20} /><span>Student Risk Profile</span>
             </Link>
           </div>
         </nav>
-        
         <div className="sidebar-footer">
           <Link to="/logout" className="nav-item">
-            <LogOut size={20} />
-            <span>Logout</span>
+            <LogOut size={20} /><span>Logout</span>
           </Link>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="main-content">
         <div className="content-header">
           <h1>Anomaly Detection</h1>
           <p>Monitor and review flagged attendance patterns and irregularities</p>
         </div>
 
-        {/* Controls */}
         <div className="controls-section">
           <div className="search-bar">
             <Search size={20} />
@@ -189,13 +181,9 @@ const AnomalyDetection = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
           <div className="filter-dropdown">
             <Filter size={20} />
-            <select
-              value={filterReason}
-              onChange={(e) => setFilterReason(e.target.value)}
-            >
+            <select value={filterReason} onChange={(e) => setFilterReason(e.target.value)}>
               <option value="all">All Reasons</option>
               {reasons.map(reason => (
                 <option key={reason} value={reason}>{reason}</option>
@@ -204,113 +192,75 @@ const AnomalyDetection = () => {
           </div>
         </div>
 
-        {/* Summary Cards */}
         <div className="summary-cards">
-          <div className="summary-card">
-            <h3>Total Anomalies</h3>
-            <div className="card-value">{flaggedRecords.length}</div>
-          </div>
-          <div className="summary-card">
-            <h3>Pending Review</h3>
-            <div className="card-value">
-              {flaggedRecords.filter(r => r.status === 'pending').length}
-            </div>
-          </div>
-          <div className="summary-card">
-            <h3>High Risk</h3>
-            <div className="card-value">
-              {flaggedRecords.filter(r => r.risk_score >= 90).length}
-            </div>
-          </div>
-          <div className="summary-card">
-            <h3>False Positives</h3>
-            <div className="card-value">
-              {flaggedRecords.filter(r => r.status === 'false_positive').length}
-            </div>
-          </div>
+          <div className="summary-card"><h3>Total Anomalies</h3><div className="card-value">{totalAnomalies}</div></div>
+          <div className="summary-card"><h3>Pending Review</h3><div className="card-value">{pendingReview}</div></div>
+          <div className="summary-card"><h3>High Risk</h3><div className="card-value">{highRisk}</div></div>
+          <div className="summary-card"><h3>False Positives</h3><div className="card-value">{falsePositives}</div></div>
         </div>
 
-        {/* Flagged Records Table */}
-        <div className="table-container">
-          <div className="table-header">
-            <h2>Flagged Records</h2>
-          </div>
-          
-          <div className="table-wrapper">
-            <table className="anomaly-table">
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>Student ID</th>
-                  <th>Student Name</th>
-                  <th>Date</th>
-                  <th>Reason</th>
-                  <th>Risk Score</th>
-                  <th>Details</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRecords.map(record => (
-                  <tr key={record.id} className={`record-row ${record.status}`}>
-                    <td className="status-cell">
-                      {getStatusIcon(record.status)}
-                    </td>
-                    <td className="student-id">{record.student_id}</td>
-                    <td className="student-name">{record.student_name}</td>
-                    <td className="date">{record.date}</td>
-                    <td className="reason">
-                      <span className="reason-badge">{record.reason}</span>
-                    </td>
-                    <td className="risk-score">
-                      <span className={`risk-badge ${getRiskScoreColor(record.risk_score)}`}>
-                        {record.risk_score}
-                      </span>
-                    </td>
-                    <td className="details">{record.details}</td>
-                    <td className="actions">
-                      {record.status === 'pending' && (
-                        <div className="action-buttons">
-                          <button
-                            className="btn-confirm"
-                            onClick={() => handleOverride(record.id, 'confirmed')}
-                            title="Confirm Anomaly"
-                          >
-                            <XCircle size={16} />
-                          </button>
-                          <button
-                            className="btn-false-positive"
-                            onClick={() => handleOverride(record.id, 'false_positive')}
-                            title="Mark as False Positive"
-                          >
-                            <CheckCircle size={16} />
-                          </button>
-                        </div>
-                      )}
-                      {record.status !== 'pending' && (
-                        <button
-                          className="btn-reset"
-                          onClick={() => handleOverride(record.id, 'pending')}
-                          title="Reset to Pending"
-                        >
-                          Reset
-                        </button>
-                      )}
-                    </td>
+        {loading ? (
+          <p className="loading">Loading...</p>
+        ) : error ? (
+          <p className="error">{error}</p>
+        ) : (
+          <>
+            <div className="table-container">
+              <table className="anomaly-table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Student ID</th>
+                    <th>Student Name</th>
+                    <th>Date</th>
+                    <th>Reason</th>
+                    <th>Risk Score</th>
+                    <th>Details</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          {filteredRecords.length === 0 && (
-            <div className="no-results">
-              <AlertCircle size={48} />
-              <h3>No anomalies found</h3>
-              <p>No records match your current search and filter criteria.</p>
+                </thead>
+                <tbody>
+                  {filteredRecords.map(record => (
+                    <tr key={record.id}>
+                      <td>{getStatusIcon(record.status)}</td>
+                      <td>{record.student_id}</td>
+                      <td>{record.student_name}</td>
+                      <td>{record.date || 'N/A'}</td>
+                      <td><span className="reason-badge">{record.reason}</span></td>
+                      <td><span className={`risk-badge ${getRiskScoreColor(record.risk_score)}`}>{record.risk_score}</span></td>
+                      <td>{record.details}</td>
+                      <td>
+                        {record.status === 'pending' ? (
+                          <>
+                            <button className="btn-confirm" onClick={() => handleOverride(record.id, 'confirmed')}><XCircle /></button>
+                            <button className="btn-false-positive" onClick={() => handleOverride(record.id, 'false_positive')}><CheckCircle /></button>
+                          </>
+                        ) : (
+                          <button className="btn-reset" onClick={() => handleOverride(record.id, 'pending')}>Reset</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredRecords.length === 0 && (
+                <div className="no-results">
+                  <AlertCircle size={48} />
+                  <h3>No anomalies found</h3>
+                  <p>Try adjusting filters or search keywords.</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            <div className="pagination">
+              <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Previous</button>
+              <span>Page {page} of {totalPages}</span>
+              <button disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next</button>
+            </div>
+          </>
+        )}
+
+        <ToastContainer position="bottom-right" autoClose={2000} />
       </main>
     </div>
   );
